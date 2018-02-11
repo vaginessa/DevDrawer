@@ -5,9 +5,11 @@ import android.appwidget.AppWidgetManager
 import android.appwidget.AppWidgetProvider
 import android.content.Context
 import android.content.Intent
+import android.content.Intent.FLAG_ACTIVITY_NEW_TASK
 import android.net.Uri
 import android.preference.PreferenceManager
 import android.widget.RemoteViews
+import de.psdev.devdrawer.DevDrawerApplication
 import de.psdev.devdrawer.R
 import de.psdev.devdrawer.activities.ClickHandlingActivity
 import de.psdev.devdrawer.activities.MainActivity
@@ -29,13 +31,23 @@ class DDWidgetProvider: AppWidgetProvider() {
             } else {
                 RemoteViews(context.packageName, R.layout.widget_layout_dark)
             }
+
+            // TODO move somewhere else
+            val application = context.applicationContext as DevDrawerApplication
+            val devDrawerDatabase = application.devDrawerDatabase
+            val widgetConfig = devDrawerDatabase.widgetConfigDao()
+                    .widgets(appWidgetId)
+                    .blockingFirst()
+                    .first()
+            widget.setTextViewText(R.id.text_title, widgetConfig.name)
+
             val reloadPendingIntent = PendingIntent.getBroadcast(context, 0, Intent(Constants.ACTION_REFRESH_APPS).apply {
                 setPackage(context.packageName)
             }, PendingIntent.FLAG_UPDATE_CURRENT)
             widget.setOnClickPendingIntent(R.id.btn_reload, reloadPendingIntent)
 
-            val mainActivityIntent = MainActivity.createStartIntent(context)
-            mainActivityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            val mainActivityIntent = MainActivity.createStartIntent(context, appWidgetId)
+            mainActivityIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK or FLAG_ACTIVITY_NEW_TASK)
             val mainActivityPendingIntent = PendingIntent.getActivity(context, 0, mainActivityIntent, PendingIntent.FLAG_UPDATE_CURRENT)
             widget.setOnClickPendingIntent(R.id.btn_settings, mainActivityPendingIntent)
 

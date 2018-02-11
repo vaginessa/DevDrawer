@@ -52,8 +52,8 @@ class DDWidgetViewsFactory(private val context: Context, intent: Intent): Remote
             context.registerReceiver(receiver, IntentFilter(Constants.ACTION_REFRESH_APPS))
 
         }.subscribe {
-                appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, viewId)
-            }
+                    appWidgetManager.notifyAppWidgetViewDataChanged(appWidgetId, viewId)
+                }
     }
 
     override fun onDataSetChanged() {
@@ -125,7 +125,7 @@ class DDWidgetViewsFactory(private val context: Context, intent: Intent): Remote
     override fun hasStableIds(): Boolean = true
 
     // ==========================================================================================================================
-    // Private APi
+    // Private API
     // ==========================================================================================================================
 
     /**
@@ -137,30 +137,30 @@ class DDWidgetViewsFactory(private val context: Context, intent: Intent): Remote
         val devDrawerDatabase = application.devDrawerDatabase
 
         val packageFilters = devDrawerDatabase.packageFilterDao()
-            .filters()
-            .blockingFirst(emptyList())
-            .map { it.filter.replace("*", ".*").toRegex() }
+                .filtersForWidget(appWidgetId)
+                .blockingFirst(emptyList())
+                .map { it.filter.replace("*", ".*").toRegex() }
 
         val appList = packageManager.getInstalledPackages(0)
-            .filter {
-                return@filter packageFilters.any { filter ->
-                    return@any filter.matches(it.packageName)
+                .filter {
+                    return@filter packageFilters.any { filter ->
+                        return@any filter.matches(it.packageName)
+                    }
                 }
-            }
-            .mapNotNull {
-                try {
-                    val applicationInfo: ApplicationInfo = packageManager.getPackageInfo(it.packageName, PackageManager.GET_ACTIVITIES).applicationInfo
-                    val appName = applicationInfo.loadLabel(packageManager).toString()
-                    val appIcon = applicationInfo.loadIcon(packageManager)
-                    return@mapNotNull AppInfo(appName, it.packageName, appIcon, it.firstInstallTime, it.lastUpdateTime)
-                } catch (e: Exception) {
-                    logger.warn("Error: {}", e.message, e)
+                .mapNotNull {
+                    try {
+                        val applicationInfo: ApplicationInfo = packageManager.getPackageInfo(it.packageName, PackageManager.GET_ACTIVITIES).applicationInfo
+                        val appName = applicationInfo.loadLabel(packageManager).toString()
+                        val appIcon = applicationInfo.loadIcon(packageManager)
+                        return@mapNotNull AppInfo(appName, it.packageName, appIcon, it.firstInstallTime, it.lastUpdateTime)
+                    } catch (e: Exception) {
+                        logger.warn("Error: {}", e.message, e)
+                    }
+                    return@mapNotNull null
                 }
-                return@mapNotNull null
-            }
-            .sortedWith(appComparator)
-            .distinct()
-            .toList()
+                .sortedWith(appComparator)
+                .distinct()
+                .toList()
 
         apps.clear()
         apps.addAll(appList)

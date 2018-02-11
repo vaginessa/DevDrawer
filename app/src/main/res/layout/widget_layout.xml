@@ -1,15 +1,26 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+                xmlns:tools="http://schemas.android.com/tools"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
     <LinearLayout
         android:id="@+id/container_actions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:background="@color/primary"
-        android:gravity="end"
         android:padding="4dp">
+
+        <TextView
+            android:id="@+id/text_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:layout_weight="1"
+            android:paddingLeft="4dp"
+            android:textColor="@android:color/white"
+            android:textSize="20sp"
+            tools:text="Title"/>
 
         <ImageButton
             android:id="@+id/btn_reload"
@@ -17,7 +28,7 @@
             android:layout_height="wrap_content"
             android:background="@null"
             android:padding="4dp"
-            android:src="@drawable/ic_refresh" />
+            android:src="@drawable/ic_refresh"/>
 
         <ImageButton
             android:id="@+id/btn_settings"
@@ -25,7 +36,7 @@
             android:layout_height="wrap_content"
             android:background="@null"
             android:padding="4dp"
-            android:src="@drawable/ic_settings" />
+            android:src="@drawable/ic_settings"/>
 
     </LinearLayout>
 
@@ -34,7 +45,7 @@
         android:layout_width="4dp"
         android:layout_height="match_parent"
         android:layout_below="@id/container_actions"
-        android:background="@color/primary" />
+        android:background="@color/primary"/>
 
     <ListView
         android:id="@+id/listView"
@@ -45,6 +56,6 @@
         android:layout_toRightOf="@+id/orangeImage"
         android:background="@drawable/background_repeat"
         android:divider="@null"
-        android:dividerHeight="0dp" />
+        android:dividerHeight="0dp"/>
 
 </RelativeLayout>

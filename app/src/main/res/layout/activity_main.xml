@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="match_parent"
-    android:layout_height="match_parent">
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
 
     <TextView
         android:id="@+id/filterTitle"
@@ -16,7 +16,7 @@
         android:fontFamily="sans-serif"
         android:text="@string/packagefilter"
         android:textColor="@android:color/black"
-        android:textSize="12sp" />
+        android:textSize="12sp"/>
 
     <AutoCompleteTextView
         android:id="@+id/addPackageEditText"
@@ -32,16 +32,14 @@
         android:layout_toStartOf="@+id/addButton"
         android:fontFamily="sans-serif-light"
         android:hint="@string/package_filter_hint"
-        android:inputType="textNoSuggestions" />
+        android:inputType="textNoSuggestions"/>
 
-    <ListView
-        android:id="@+id/packagesFilterListView"
+    <android.support.v4.view.ViewPager
+        android:id="@+id/pager"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:layout_alignParentLeft="true"
-        android:layout_alignParentStart="true"
-        android:layout_below="@id/addPackageEditText"
-        android:background="@drawable/background_repeat" />
+        android:layout_height="wrap_content"
+        android:layout_alignParentBottom="true"
+        android:layout_below="@id/addPackageEditText"/>
 
     <ImageView
         android:id="@+id/addButton"
@@ -53,5 +51,5 @@
         android:layout_alignTop="@id/addPackageEditText"
         android:layout_marginEnd="10dp"
         android:layout_marginRight="10dp"
-        android:src="@drawable/add_imageview" />
+        android:src="@drawable/add_imageview"/>
 </RelativeLayout>

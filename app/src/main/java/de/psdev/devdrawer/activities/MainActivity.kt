@@ -10,38 +10,41 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.Menu
 import android.view.MenuItem
-import android.widget.Toast
 import de.psdev.devdrawer.DevDrawerApplication
 import de.psdev.devdrawer.R
-import de.psdev.devdrawer.adapters.FilterListAdapter
 import de.psdev.devdrawer.adapters.PartialMatchAdapter
+import de.psdev.devdrawer.adapters.WidgetAdapter
 import de.psdev.devdrawer.appwidget.DDWidgetProvider
-import de.psdev.devdrawer.database.PackageFilter
-import de.psdev.devdrawer.database.PackageFilterDao
+import de.psdev.devdrawer.database.WidgetConfig
+import de.psdev.devdrawer.database.WidgetConfigDao
 import de.psdev.devdrawer.utils.Constants
 import de.psdev.devdrawer.utils.consume
 import de.psdev.devdrawer.utils.getExistingPackages
+import io.reactivex.Completable
 import io.reactivex.android.schedulers.AndroidSchedulers
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.rxkotlin.plusAssign
-import io.reactivex.rxkotlin.subscribeBy
 import io.reactivex.schedulers.Schedulers
-import kotlinx.android.synthetic.main.main.*
+import kotlinx.android.synthetic.main.activity_main.*
 import mu.KLogging
 
 class MainActivity: AppCompatActivity(), TextWatcher {
 
     companion object: KLogging() {
         @JvmStatic
-        fun createStartIntent(context: Context): Intent = Intent(context, MainActivity::class.java)
+        fun createStartIntent(context: Context, appWidgetId: Int): Intent = Intent(context, MainActivity::class.java).apply {
+            action = "${Constants.ACTION_EDIT_FILTER}$appWidgetId"
+            putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
+        }
     }
 
     private val devDrawerDatabase by lazy { (application as DevDrawerApplication).devDrawerDatabase }
     private val appPackages: List<String> by lazy { packageManager.getExistingPackages() }
-    private val filterListAdapter: FilterListAdapter by lazy { FilterListAdapter(this, devDrawerDatabase) }
     private val packageNameCompletionAdapter: PartialMatchAdapter by lazy { PartialMatchAdapter(this, appPackages, devDrawerDatabase) }
-    private val packageFilterDao: PackageFilterDao by lazy { devDrawerDatabase.packageFilterDao() }
+    private val widgetConfigDao: WidgetConfigDao by lazy { devDrawerDatabase.widgetConfigDao() }
     private val subscriptions = CompositeDisposable()
+    private val widgetAdapter by lazy { WidgetAdapter(supportFragmentManager) }
+    private val appWidgetId by lazy { getWidgetId() }
 
     // ==========================================================================================================================
     // Android Lifecycle
@@ -49,58 +52,49 @@ class MainActivity: AppCompatActivity(), TextWatcher {
 
     public override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-
-        setContentView(R.layout.main)
+        setContentView(R.layout.activity_main)
 
         actionBar?.apply {
             setDisplayShowTitleEnabled(true)
             title = "DevDrawer"
         }
 
-        subscriptions += packageFilterDao.filters()
-            .subscribeOn(Schedulers.io())
-            .observeOn(AndroidSchedulers.mainThread())
-            .subscribe {
-                filterListAdapter.data = it
-            }
+        subscriptions += saveNewWidget()
+                .andThen(widgetConfigDao.widgets())
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe {
+                    widgetAdapter.setItems(it)
+                    val index = it.indexOfFirst { it.widgetId == appWidgetId }
+                    if (index in 0 until it.size) {
+                        pager.setCurrentItem(index, false)
+                    }
+                }
+    }
+
+    private fun saveNewWidget(): Completable = if (intent?.action == AppWidgetManager.ACTION_APPWIDGET_CONFIGURE) {
+        widgetConfigDao.addWidgetAsync(WidgetConfig(name = "unnamed ($appWidgetId)", widgetId = appWidgetId))
+    } else {
+        Completable.complete()
     }
 
     override fun onContentChanged() {
         super.onContentChanged()
-        packagesFilterListView.adapter = filterListAdapter
+        pager.adapter = widgetAdapter
         addPackageEditText.setAdapter(packageNameCompletionAdapter)
         addPackageEditText.addTextChangedListener(this)
-        addButton.setOnClickListener { view ->
-            val filter = addPackageEditText.text.toString()
-            if (filter.isNotEmpty()) {
-                if (!filterListAdapter.data.map { it.filter }.contains(filter)) {
-                    subscriptions += packageFilterDao.addFilterAsync(PackageFilter(filter = filter))
-                        .subscribeOn(Schedulers.io())
-                        .observeOn(AndroidSchedulers.mainThread())
-                        .subscribeBy(onComplete = {
-                            addPackageEditText.setText("")
-                            sendBroadcast(Intent(Constants.ACTION_REFRESH_APPS).apply {
-                                setPackage(applicationContext.packageName)
-                            })
-                        })
-                } else {
-                    Toast.makeText(this, "Filter already exists", Toast.LENGTH_SHORT).show()
-                }
-            }
-
+        addButton.setOnClickListener { _ ->
+            val widgetId = widgetAdapter.getCurrentWidgetId(pager.currentItem)
+            supportFragmentManager.fragments.map { it as WidgetConfigFragment }.forEach { it.addFilter(addPackageEditText.text.toString(), widgetId) }
         }
     }
 
     override fun onBackPressed() {
-        val intent = intent
-        val extras = intent.extras
-        var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
-        if (extras != null) {
-            appWidgetId = extras.getInt(
-                AppWidgetManager.EXTRA_APPWIDGET_ID,
-                AppWidgetManager.INVALID_APPWIDGET_ID)
-        }
+        saveWidget()
+        super.onBackPressed()
+    }
 
+    private fun saveWidget() {
         if (appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
             val appWidgetManager = AppWidgetManager.getInstance(this)
             val widget = DDWidgetProvider.createRemoteViews(this, appWidgetId)
@@ -110,30 +104,24 @@ class MainActivity: AppCompatActivity(), TextWatcher {
             setResult(Activity.RESULT_OK, resultValue)
             finish()
         }
-
-        super.onBackPressed()
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        when (resultCode) {
-            Constants.EDIT_DIALOG_CHANGE -> {
-                data?.let {
-                    val id = it.getIntExtra("id", -1)
-                    val newFilter = it.getStringExtra("newText")
-                    packageFilterDao.updateFilter(id, newFilter)
-                }
-            }
+        for (fragment in supportFragmentManager.fragments) {
+            fragment.onActivityResult(requestCode, resultCode, data)
         }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.activity_main, menu)
+        menu.findItem(R.id.action_confirm)?.isVisible = appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID
         return super.onCreateOptionsMenu(menu)
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
+            R.id.action_confirm -> consume { startActivity(Intent(this, PrefActivity::class.java)) }
             R.id.action_settings -> consume { startActivity(Intent(this, PrefActivity::class.java)) }
             R.id.action_info -> consume { TODO("Implement app info screen") }
             else -> super.onOptionsItemSelected(item)
@@ -154,8 +142,14 @@ class MainActivity: AppCompatActivity(), TextWatcher {
     override fun onTextChanged(charSequence: CharSequence, i: Int, i2: Int, i3: Int) {}
 
     override fun afterTextChanged(editable: Editable) {
-        packageNameCompletionAdapter.getFilter().filter(editable.toString())
+        packageNameCompletionAdapter.filter.filter(editable.toString())
     }
 
+    // ==========================================================================================================================
+    // Private API
+    // ==========================================================================================================================
+
+    private fun getWidgetId(): Int = intent?.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID)
+            ?: AppWidgetManager.INVALID_APPWIDGET_ID
 }
 

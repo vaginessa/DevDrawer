@@ -10,4 +10,6 @@ data class PackageFilter(
     @ColumnInfo(name = "id", typeAffinity = ColumnInfo.INTEGER)
     val id: Int = 0,
     @ColumnInfo(name = "filter", typeAffinity = ColumnInfo.TEXT)
-    val filter: String)
+    val filter: String,
+    @ColumnInfo(name = "widgetId", typeAffinity = ColumnInfo.INTEGER)
+    val widgetId: Int)
